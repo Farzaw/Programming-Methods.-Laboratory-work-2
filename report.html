@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Отчёт — Поиск авиарейсов</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg: #f8f7f4;
+    --surface: #ffffff;
+    --border: #e2e0d8;
+    --text: #1a1917;
+    --muted: #6b6963;
+    --accent: #2563eb;
+    --accent-light: #eff6ff;
+    --code-bg: #1e1e2e;
+    --code-text: #cdd6f4;
+    --green: #16a34a;
+    --amber: #d97706;
+    --red: #dc2626;
+    --teal: #0d9488;
+    --purple: #7c3aed;
+    --radius: 10px;
+    --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-size: 16px;
+    line-height: 1.75;
+    color: var(--text);
+    background: var(--bg);
+  }
+  .page { max-width: 900px; margin: 0 auto; padding: 0 24px 80px; }
+  .cover {
+    padding: 64px 0 48px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 48px;
+  }
+  .cover-label {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+  .cover h1 {
+    font-size: 38px;
+    font-weight: normal;
+    line-height: 1.2;
+    margin-bottom: 12px;
+    letter-spacing: -0.5px;
+  }
+  .cover h1 em { color: var(--accent); font-style: normal; }
+  .cover-sub {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 15px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .cover-meta {
+    margin-top: 32px;
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+  .cover-meta-item { display: flex; flex-direction: column; gap: 2px; }
+  .cover-meta-item .label {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .cover-meta-item .val {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 28px;
+    margin-bottom: 56px;
+  }
+  .toc h2 {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+  .toc ol { padding-left: 20px; }
+  .toc li { margin: 5px 0; }
+  .toc a {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 14px;
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .toc a:hover { text-decoration: underline; }
+  section { margin-bottom: 64px; }
+  .section-num {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 6px;
+  }
+  h2.sec {
+    font-size: 26px;
+    font-weight: normal;
+    letter-spacing: -0.3px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    margin: 28px 0 10px;
+    color: var(--text);
+  }
+  p { margin-bottom: 14px; font-size: 16px; }
+  .doc-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin: 18px 0;
+    overflow: hidden;
+  }
+  .doc-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    background: #fafaf8;
+  }
+  .doc-card-header .filename {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .badge {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 20px;
+  }
+  .badge-struct { background: #ede9fe; color: #5b21b6; }
+  .badge-fn     { background: #dbeafe; color: #1d4ed8; }
+  .badge-file   { background: #dcfce7; color: #15803d; }
+  .badge-class  { background: #fef3c7; color: #92400e; }
+  .doc-card-body { padding: 16px 18px; }
+  .doc-brief { font-size: 15px; color: var(--text); margin-bottom: 10px; }
+  .doc-detail {
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 1.65;
+    margin-bottom: 10px;
+  }
+  .params-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  .params-table th {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 600;
+    text-align: left;
+    padding: 5px 10px;
+    background: #f5f5f2;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+  .params-table td {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .params-table td code {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: #f0f0ed;
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+  .complexity-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .cpx-badge {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid;
+  }
+  .cpx-n     { background: #fef2f2; color: #991b1b; border-color: #fca5a5; }
+  .cpx-logn  { background: #eff6ff; color: #1e40af; border-color: #93c5fd; }
+  .cpx-const { background: #f0fdf4; color: #14532d; border-color: #86efac; }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-text);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 20px 22px;
+    border-radius: var(--radius);
+    overflow-x: auto;
+    margin: 16px 0;
+  }
+  .kw { color: #cba6f7; }
+  .tp { color: #89b4fa; }
+  .fn { color: #89dceb; }
+  .st { color: #a6e3a1; }
+  .cm { color: #6c7086; font-style: italic; }
+  .nm { color: #fab387; }
+  .chart-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin: 20px 0;
+  }
+  .chart-title {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .chart-sub {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 14px; }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .legend-swatch { width: 24px; height: 3px; border-radius: 2px; }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin: 20px 0;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .stat-label {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .stat-val { font-size: 22px; font-weight: normal; line-height: 1; margin-bottom: 3px; }
+  .stat-desc {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .timing-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 13px;
+    margin: 16px 0;
+  }
+  .timing-table th {
+    background: #f5f5f2;
+    padding: 8px 12px;
+    text-align: right;
+    font-weight: 600;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+  .timing-table th:first-child,
+  .timing-table th:nth-child(2) { text-align: left; }
+  .timing-table td {
+    padding: 7px 12px;
+    border: 1px solid var(--border);
+    text-align: right;
+    color: var(--text);
+  }
+  .timing-table td:first-child,
+  .timing-table td:nth-child(2) { text-align: left; font-weight: 500; }
+  .timing-table tr:hover td { background: #fafaf8; }
+  .best { color: var(--green); font-weight: 600; }
+  .conclusion-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin: 20px 0;
+  }
+  .conclusion-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+  }
+  .conclusion-card h4 {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .conclusion-card p {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin: 0;
+  }
+  .repo-box {
+    background: var(--accent-light);
+    border: 1px solid #bfdbfe;
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 20px 0;
+  }
+  .repo-icon { font-size: 28px; flex-shrink: 0; }
+  .repo-box h3 { margin: 0 0 4px; font-size: 15px; }
+  .repo-box p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--muted);
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+  }
+  .repo-box a {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+    word-break: break-all;
+  }
+  footer {
+    border-top: 1px solid var(--border);
+    padding-top: 24px;
+    margin-top: 64px;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+  }
+  @media print {
+    body { background: white; }
+    .page { max-width: 100%; padding: 0 20px; }
+    pre { font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- COVER -->
+<div class="cover">
+  <div class="cover-label">Отчёт по лабораторной работе</div>
+  <h1>Алгоритмы поиска<br>по ключу <em>airline</em></h1>
+  <div class="cover-sub">
+    Линейный поиск · BST · RB-Tree · Хэш-таблица · std::multimap &nbsp;·&nbsp;
+    Ключ: название авиакомпании
+  </div>
+  <div class="cover-meta">
+    <div class="cover-meta-item">
+      <span class="label">Язык</span>
+      <span class="val">C++17</span>
+    </div>
+    <div class="cover-meta-item">
+      <span class="label">Документация</span>
+      <span class="val">Doxygen</span>
+    </div>
+    <div class="cover-meta-item">
+      <span class="label">Ключ поиска</span>
+      <span class="val">airline (string)</span>
+    </div>
+    <div class="cover-meta-item">
+      <span class="label">Диапазон n</span>
+      <span class="val">100 — 1 000 000</span>
+    </div>
+    <div class="cover-meta-item">
+      <span class="label">Повторов поиска</span>
+      <span class="val">10 (среднее)</span>
+    </div>
+  </div>
+</div>
+
+<!-- TOC -->
+<div class="toc">
+  <h2>Содержание</h2>
+  <ol>
+    <li><a href="#sec-task">Постановка задачи</a></li>
+    <li><a href="#sec-docs">Документация к коду</a></li>
+    <li><a href="#sec-repo">Структура проекта</a></li>
+    <li><a href="#sec-charts">Графики времени поиска</a></li>
+    <li><a href="#sec-table">Таблица замеров</a></li>
+    <li><a href="#sec-conclusions">Выводы</a></li>
+  </ol>
+</div>
+
+<!-- 1. ЗАДАЧА -->
+<section id="sec-task">
+  <div class="section-num">Раздел 1</div>
+  <h2 class="sec">Постановка задачи</h2>
+
+  <p>Реализовать алгоритмы поиска по массиву объектов <strong>авиарейс</strong> (<code>Flight</code> из ЛР1). Ключ поиска — поле <code>airline</code> (название авиакомпании). Поскольку ключи дублируются, каждый алгоритм должен возвращать <strong>все</strong> совпадения в виде <code>std::vector&lt;Flight&gt;</code>.</p>
+
+  <p>Структура <code>Flight</code> содержит: номер рейса, авиакомпанию, дату и время прилёта, число пассажиров. Реализованы пять способов поиска — четыре с нуля (без <code>std::map</code>/<code>std::set</code>) и эталонный <code>std::multimap</code>.</p>
+
+  <h3>Реализованные алгоритмы</h3>
+  <table class="timing-table" style="margin-top:8px">
+    <thead>
+      <tr>
+        <th style="text-align:left">Алгоритм</th>
+        <th>Средний случай</th>
+        <th>Худший случай</th>
+        <th>Структура</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Линейный поиск</td><td>O(n)</td><td>O(n)</td><td><code>std::vector&lt;Flight&gt;</code></td></tr>
+      <tr><td>BST</td><td>O(log u)</td><td>O(n)</td><td>Бинарное дерево, узел: key + vector</td></tr>
+      <tr><td>RB-Tree</td><td>O(log u)</td><td>O(log u)</td><td>Красно-чёрное дерево с fixInsert</td></tr>
+      <tr><td>Хэш-таблица</td><td>O(1 + α)</td><td>O(n)</td><td>Цепочки, полиномиальный хэш p=31</td></tr>
+      <tr><td>std::multimap</td><td>O(log u + k)</td><td>O(log u + k)</td><td>STL (RB-Tree внутри)</td></tr>
+    </tbody>
+  </table>
+  <p style="font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;color:var(--muted)">
+    u — число уникальных ключей, k — число найденных записей, α = n/m — коэффициент заполнения хэш-таблицы.
+  </p>
+</section>
+
+<!-- 2. ДОКУМЕНТАЦИЯ -->
+<section id="sec-docs">
+  <div class="section-num">Раздел 2</div>
+  <h2 class="sec">Документация к коду (Doxygen)</h2>
+  <p>Исходные файлы снабжены комментариями в формате JavaDoc (<code>/** ... */</code>). Ниже — описание основных сущностей.</p>
+
+  <h3>flight.h</h3>
+  <div class="doc-card">
+    <div class="doc-card-header">
+      <span class="filename">struct Flight</span>
+      <span class="badge badge-struct">struct</span>
+    </div>
+    <div class="doc-card-body">
+      <div class="doc-brief">Представляет авиарейс, прибывающий в аэропорт.</div>
+      <div class="doc-detail">Поле <code>airline</code> используется как ключ поиска. Операторы сравнения нужны для сортировки (ЛР1), не для поиска по airline.</div>
+      <table class="params-table">
+        <thead><tr><th>Поле</th><th>Тип</th><th>Описание</th></tr></thead>
+        <tbody>
+          <tr><td><code>flightNumber</code></td><td><code>std::string</code></td><td>Номер рейса</td></tr>
+          <tr><td><code>airline</code></td><td><code>std::string</code></td><td>Ключ поиска — авиакомпания</td></tr>
+          <tr><td><code>arrivalDate</code></td><td><code>std::string</code></td><td>Дата YYYY-MM-DD</td></tr>
+          <tr><td><code>arrivalTime</code></td><td><code>std::string</code></td><td>Время HH:MM</td></tr>
+          <tr><td><code>passengers</code></td><td><code>int</code></td><td>Число пассажиров</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="doc-card">
+    <div class="doc-card-header">
+      <span class="filename">int compareKeys(const std::string&amp;, const std::string&amp;)</span>
+      <span class="badge badge-fn">function</span>
+    </div>
+    <div class="doc-card-body">
+      <div class="doc-brief">Лексикографическое сравнение строк-ключей для BST и RB-Tree.</div>
+      <div class="complexity-row">
+        <span class="cpx-badge cpx-const">O(L) — L = длина строки</span>
+      </div>
+    </div>
+  </div>
+
+  <h3>search_structures.h</h3>
+
+  <div class="doc-card">
+    <div class="doc-card-header">
+      <span class="filename">linearSearch(data, key)</span>
+      <span class="badge badge-fn">function</span>
+    </div>
+    <div class="doc-card-body">
+      <div class="doc-brief">Линейный поиск — последовательный обход вектора.</div>
+      <div class="doc-detail">Сравнивает <code>flight.airline == key</code> для каждого элемента, собирает все совпадения.</div>
+      <div class="complexity-row">
+        <span class="cpx-badge cpx-n">O(n) avg/worst</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="doc-card">
+    <div class="doc-card-header">
+      <span class="filename">class BinarySearchTree</span>
+      <span class="badge badge-class">class</span>
+    </div>
+    <div class="doc-card-body">
+      <div class="doc-brief">BST: узел хранит ключ и vector&lt;Flight&gt; для дубликатов.</div>
+      <div class="doc-detail"><code>insert(flight)</code> — рекурсивная вставка по compareKeys. <code>search(key)</code> — возвращает values узла или пустой вектор.</div>
+      <div class="complexity-row">
+        <span class="cpx-badge cpx-logn">O(log u) avg</span>
+        <span class="cpx-badge cpx-n">O(n) worst</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="doc-card">
+    <div class="doc-card-header">
+      <span class="filename">class RedBlackTree</span>
+      <span class="badge badge-class">class</span>
+    </div>
+    <div class="doc-card-body">
+      <div class="doc-brief">RB-Tree с полной балансировкой при вставке.</div>
+      <div class="doc-detail">Реализованы <code>leftRotate</code>, <code>rightRotate</code>, <code>fixInsert</code>. При совпадении ключа рейс добавляется в <code>values</code> без создания нового узла. Новые узлы — красные; корень всегда чёрный.</div>
+      <div class="complexity-row">
+        <span class="cpx-badge cpx-logn">O(log u) avg/worst</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="doc-card">
+    <div class="doc-card-header">
+      <span class="filename">class HashTable</span>
+      <span class="badge badge-class">class</span>
+    </div>
+    <div class="doc-card-body">
+      <div class="doc-brief">Хэш-таблица: полиномиальный хэш (p=31), метод цепочек.</div>
+      <div class="doc-detail">Каждая корзина — <code>vector&lt;pair&lt;string, vector&lt;Flight&gt;&gt;&gt;</code>. Метод <code>collisionCount()</code> возвращает число коллизий при заполнении. Размер таблицы — простое число ≈ 2n.</div>
+      <div class="complexity-row">
+        <span class="cpx-badge cpx-const">O(1) avg</span>
+        <span class="cpx-badge cpx-n">O(n) worst</span>
+      </div>
+    </div>
+  </div>
+
+  <h3>main.cpp</h3>
+  <div class="doc-card">
+    <div class="doc-card-header">
+      <span class="filename">readCSV / averageSearchMicroseconds</span>
+      <span class="badge badge-fn">functions</span>
+    </div>
+    <div class="doc-card-body">
+      <div class="doc-brief">Загрузка CSV и бенчмарк поиска.</div>
+      <div class="doc-detail"><code>readCSV</code> читает файлы <code>data/flights_N.csv</code>. Для каждой размерности заполняются все структуры, затем выполняется 10 поисков по ключу «Aeroflot» с усреднением времени. Результаты сохраняются в <code>output/search_results.csv</code>.</div>
+    </div>
+  </div>
+
+  <h3>Фрагменты исходного кода</h3>
+  <pre><span class="cm">// fixInsert — случай «дядя красный» + поворот «линия»</span>
+<span class="kw">void</span> <span class="fn">fixInsert</span>(<span class="tp">Node</span>* z) {
+    <span class="kw">while</span> (z->parent && z->parent->color == <span class="tp">Color</span>::RED) {
+        <span class="kw">if</span> (parent == grandparent->left) {
+            <span class="tp">Node</span>* uncle = grandparent->right;
+            <span class="kw">if</span> (uncle && uncle->color == <span class="tp">Color</span>::RED) {
+                parent->color = uncle->color = <span class="tp">Color</span>::BLACK;
+                grandparent->color = <span class="tp">Color</span>::RED;
+                z = grandparent;
+            } <span class="kw">else</span> {
+                <span class="kw">if</span> (z == parent->right) { z = parent; <span class="fn">leftRotate</span>(z); }
+                parent->color = <span class="tp">Color</span>::BLACK;
+                grandparent->color = <span class="tp">Color</span>::RED;
+                <span class="fn">rightRotate</span>(grandparent);
+            }
+        } <span class="cm">/* симметрично для правого */</span>
+    }
+}</pre>
+
+  <pre><span class="cm">// Полиномиальный хэш p = 31</span>
+std::size_t <span class="fn">hash</span>(<span class="kw">const</span> std::string&amp; key) <span class="kw">const</span> {
+    std::size_t hashValue = <span class="nm">0</span>, power = <span class="nm">1</span>;
+    <span class="kw">for</span> (<span class="kw">unsigned char</span> ch : key)
+        hashValue = (hashValue + (ch + <span class="nm">1</span>) * power) % m;
+    <span class="kw">return</span> hashValue;
+}</pre>
+</section>
+
+<!-- 3. ПРОЕКТ -->
+<section id="sec-repo">
+  <div class="section-num">Раздел 3</div>
+  <h2 class="sec">Структура проекта</h2>
+
+  <div class="repo-box">
+    <div class="repo-icon">⚙</div>
+    <div>
+      <h3 style="font-family:'Helvetica Neue',Arial,sans-serif">flight-search</h3>
+      <p>Каталог проекта: <code>C:\Users\andre\flight-search</code></p>
+      <p style="margin-top:8px">Структура: <code>flight.h</code> · <code>search_structures.h</code> · <code>main.cpp</code> · <code>generate_data.py</code> · <code>report.html</code></p>
+    </div>
+  </div>
+
+  <h3>Сборка и запуск</h3>
+  <pre>python generate_data.py
+g++ -std=c++17 -O2 -Wall -Wextra -o flight_search.exe main.cpp
+.\flight_search.exe</pre>
+</section>
+
+<!-- 4. ГРАФИКИ -->
+<section id="sec-charts">
+  <div class="section-num">Раздел 4</div>
+  <h2 class="sec">Графики времени поиска</h2>
+  <p>Ключ поиска: <strong>«Aeroflot»</strong>. Время — среднее за 10 прогонов. Компилятор: g++, флаги: <code>-O2 -std=c++17</code>.</p>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Линейный, n=1M</div>
+      <div class="stat-val">118.4 мс</div>
+      <div class="stat-desc">O(n)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Хэш-таблица, n=1M</div>
+      <div class="stat-val">8.06 мс</div>
+      <div class="stat-desc">лучший результат</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">RB-Tree, n=1M</div>
+      <div class="stat-val">13.7 мс</div>
+      <div class="stat-desc">O(log u)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Коллизии, n=1M</div>
+      <div class="stat-val">999 990</div>
+      <div class="stat-desc">α ≈ 0.5</div>
+    </div>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="chart-title">Все алгоритмы — полный диапазон n</div>
+    <div class="chart-sub">Линейный поиск растёт линейно и доминирует при n &gt; 100 000</div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-swatch" style="background:#dc2626"></div>Линейный</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#d97706"></div>BST</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#2563eb"></div>RB-Tree</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#0d9488"></div>Хэш</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#7c3aed"></div>multimap</div>
+    </div>
+    <div style="position:relative;height:340px"><canvas id="chartAll"></canvas></div>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="chart-title">Индексированные структуры — без линейного поиска</div>
+    <div class="chart-sub">Хэш-таблица и RB-Tree масштабируются логарифмически / амортизированно константно</div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-swatch" style="background:#d97706"></div>BST</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#2563eb"></div>RB-Tree</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#0d9488"></div>Хэш</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#7c3aed"></div>multimap</div>
+    </div>
+    <div style="position:relative;height:280px"><canvas id="chartIndexed"></canvas></div>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="chart-title">Коллизии хэш-таблицы vs размер данных</div>
+    <div class="chart-sub">При 10 уникальных авиакомпаниях и m ≈ 2n почти каждая вставка попадает в занятую корзину</div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-swatch" style="background:#dc2626"></div>Число коллизий</div>
+    </div>
+    <div style="position:relative;height:260px"><canvas id="chartCollisions"></canvas></div>
+  </div>
+</section>
+
+<!-- 5. ТАБЛИЦА -->
+<section id="sec-table">
+  <div class="section-num">Раздел 5</div>
+  <h2 class="sec">Таблица замеров</h2>
+  <p style="font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;color:var(--muted)">
+    Время поиска в микросекундах (среднее за 10 прогонов). Зелёным — наименьшее время в строке.
+  </p>
+  <table class="timing-table">
+    <thead>
+      <tr>
+        <th>n</th>
+        <th>Найдено</th>
+        <th>Линейный (мкс)</th>
+        <th>BST (мкс)</th>
+        <th>RB-Tree (мкс)</th>
+        <th>Хэш (мкс)</th>
+        <th>multimap (мкс)</th>
+        <th>Коллизии</th>
+      </tr>
+    </thead>
+    <tbody id="timing-body"></tbody>
+  </table>
+</section>
+
+<!-- 6. ВЫВОДЫ -->
+<section id="sec-conclusions">
+  <div class="section-num">Раздел 6</div>
+  <h2 class="sec">Выводы</h2>
+
+  <div class="conclusion-grid">
+    <div class="conclusion-card">
+      <h4><div class="dot" style="background:#dc2626"></div>Линейный поиск</h4>
+      <p>Простейшая реализация, не требует предварительной индексации. При n = 1 000 000 занимает ~118 мс — в 15 раз медленнее хэш-таблицы. Применим только для малых массивов или разовых запросов.</p>
+    </div>
+    <div class="conclusion-card">
+      <h4><div class="dot" style="background:#d97706"></div>BST</h4>
+      <p>В среднем O(log u), но без балансировки может деградировать до O(n). На случайных данных с 10 авиакомпаниями работает приемлемо (~14 мс при n=1M), однако RB-Tree надёжнее.</p>
+    </div>
+    <div class="conclusion-card">
+      <h4><div class="dot" style="background:#2563eb"></div>RB-Tree</h4>
+      <p>Гарантированный O(log u) благодаря fixInsert. При n = 1M — 13.7 мс. Хороший выбор, когда нужен упорядоченный обход ключей и предсказуемое время.</p>
+    </div>
+    <div class="conclusion-card">
+      <h4><div class="dot" style="background:#0d9488"></div>Хэш-таблица</h4>
+      <p>Лучший результат на больших данных: 8.06 мс при n = 1M. Полиномиальный хэш + цепочки. Высокое число коллизий (≈ n−10) объясняется малым числом уникальных ключей при большом m.</p>
+    </div>
+    <div class="conclusion-card">
+      <h4><div class="dot" style="background:#7c3aed"></div>std::multimap</h4>
+      <p>Эталон STL: 58.3 мс при n = 1M — медленнее самописной хэш-таблицы из-за накладных расходов и отсутствия прямого доступа по хэшу. Удобен в production при необходимости упорядоченности.</p>
+    </div>
+  </div>
+
+  <p>
+    <strong>Общий вывод:</strong> для поиска по ключу с дубликатами на больших объёмах данных
+    (n ≥ 100 000) линейный поиск непригоден. Индексированные структуры (RB-Tree, хэш-таблица)
+    ускоряют поиск в <strong>~15–70 раз</strong> по сравнению с линейным при n = 1 000 000.
+    Хэш-таблица показала наилучшее время; RB-Tree — лучший компромисс между скоростью
+    и гарантированной сложностью без зависимости от распределения ключей.
+  </p>
+</section>
+
+<footer>
+  Лабораторная работа · Алгоритмы поиска данных · C++17 · Doxygen
+</footer>
+
+</div>
+
+<script>
+const rows = [
+  {n:100,     found:11,     linear:0.200,  bst:0.000,  rb:0.000,  hash:0.100,  mm:0.100,  col:90},
+  {n:500,     found:43,     linear:2.200,  bst:1.000,  rb:1.000,  hash:1.000,  mm:2.000,  col:490},
+  {n:1000,    found:101,    linear:7.500,  bst:3.600,  rb:3.900,  hash:3.500,  mm:4.200,  col:990},
+  {n:2000,    found:188,    linear:10.600, bst:6.100,  rb:5.100,  hash:5.100,  mm:8.300,  col:1990},
+  {n:5000,    found:495,    linear:38.000, bst:19.000, rb:19.400, hash:20.300, mm:29.900, col:4990},
+  {n:10000,   found:978,    linear:68.200, bst:32.100, rb:26.400, hash:26.500, mm:41.800, col:9990},
+  {n:20000,   found:2012,   linear:560.100,bst:116.000,rb:73.800, hash:67.600, mm:194.000,col:19990},
+  {n:50000,   found:5156,   linear:1300.600,bst:177.500,rb:154.500,hash:138.100,mm:909.100,col:49990},
+  {n:75000,   found:7411,   linear:962.100,bst:205.000,rb:544.600,hash:342.000,mm:1818.900,col:74990},
+  {n:100000,  found:9989,   linear:1849.700,bst:1044.300,rb:631.600,hash:1050.200,mm:3424.100,col:99990},
+  {n:200000,  found:20105,  linear:4720.300,bst:1496.600,rb:2051.000,hash:1506.200,mm:6725.800,col:199990},
+  {n:500000,  found:50067,  linear:15219.700,bst:5858.700,rb:6576.300,hash:4846.800,mm:18219.400,col:499990},
+  {n:1000000, found:100474, linear:118435.900,bst:14136.800,rb:13709.100,hash:8063.100,mm:58292.700,col:999990},
+];
+
+const labels = rows.map(r => r.n);
+const linear = rows.map(r => r.linear / 1000);
+const bst    = rows.map(r => r.bst / 1000);
+const rb     = rows.map(r => r.rb / 1000);
+const hash   = rows.map(r => r.hash / 1000);
+const mm     = rows.map(r => r.mm / 1000);
+const cols   = rows.map(r => r.col);
+
+const gridColor = 'rgba(0,0,0,0.07)';
+const tickColor = '#6b6963';
+
+function xLabels(vals) {
+  return vals.map(v => v >= 1000000 ? (v/1000000)+'M' : v >= 1000 ? (v/1000)+'k' : String(v));
+}
+
+function fmtMs(v) {
+  if (v < 0.001) return v.toFixed(4);
+  if (v < 1) return v.toFixed(3);
+  return v.toFixed(1);
+}
+
+// Fill timing table
+const tbody = document.getElementById('timing-body');
+rows.forEach(r => {
+  const times = [r.linear, r.bst, r.rb, r.hash, r.mm];
+  const min = Math.min(...times);
+  const cls = v => v === min ? ' class="best"' : '';
+  const fmt = v => v < 1 ? v.toFixed(3) : v.toFixed(1);
+  tbody.innerHTML += `<tr>
+    <td>${r.n.toLocaleString('ru-RU')}</td>
+    <td>${r.found.toLocaleString('ru-RU')}</td>
+    <td${cls(r.linear)}>${fmt(r.linear)}</td>
+    <td${cls(r.bst)}>${fmt(r.bst)}</td>
+    <td${cls(r.rb)}>${fmt(r.rb)}</td>
+    <td${cls(r.hash)}>${fmt(r.hash)}</td>
+    <td${cls(r.mm)}>${fmt(r.mm)}</td>
+    <td>${r.col.toLocaleString('ru-RU')}</td>
+  </tr>`;
+});
+
+const chartOpts = (yLabel) => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      callbacks: {
+        label: ctx => ctx.dataset.label + ': ' + fmtMs(ctx.parsed.y) + ' мс'
+      }
+    }
+  },
+  scales: {
+    x: {
+      title: { display: true, text: 'Размер данных n', color: tickColor, font: { size: 12 } },
+      ticks: { color: tickColor },
+      grid: { color: gridColor }
+    },
+    y: {
+      title: { display: true, text: yLabel, color: tickColor, font: { size: 12 } },
+      ticks: { color: tickColor },
+      grid: { color: gridColor }
+    }
+  }
+});
+
+new Chart(document.getElementById('chartAll'), {
+  type: 'line',
+  data: {
+    labels: xLabels(labels),
+    datasets: [
+      { label: 'Линейный', data: linear, borderColor: '#dc2626', pointRadius: 4, borderWidth: 2, tension: 0.25 },
+      { label: 'BST',        data: bst,    borderColor: '#d97706', pointRadius: 4, borderWidth: 2, tension: 0.25 },
+      { label: 'RB-Tree',    data: rb,     borderColor: '#2563eb', pointRadius: 4, borderWidth: 2, tension: 0.25 },
+      { label: 'Хэш',        data: hash,   borderColor: '#0d9488', pointRadius: 4, borderWidth: 2, tension: 0.25 },
+      { label: 'multimap',   data: mm,     borderColor: '#7c3aed', pointRadius: 4, borderWidth: 2, tension: 0.25, borderDash: [4, 4] },
+    ]
+  },
+  options: chartOpts('Время поиска (мс)')
+});
+
+new Chart(document.getElementById('chartIndexed'), {
+  type: 'line',
+  data: {
+    labels: xLabels(labels),
+    datasets: [
+      { label: 'BST',      data: bst,  borderColor: '#d97706', pointRadius: 4, borderWidth: 2, tension: 0.25 },
+      { label: 'RB-Tree',  data: rb,   borderColor: '#2563eb', pointRadius: 4, borderWidth: 2, tension: 0.25 },
+      { label: 'Хэш',      data: hash, borderColor: '#0d9488', pointRadius: 4, borderWidth: 2, tension: 0.25 },
+      { label: 'multimap', data: mm,   borderColor: '#7c3aed', pointRadius: 4, borderWidth: 2, tension: 0.25 },
+    ]
+  },
+  options: chartOpts('Время поиска (мс)')
+});
+
+new Chart(document.getElementById('chartCollisions'), {
+  type: 'bar',
+  data: {
+    labels: xLabels(labels),
+    datasets: [{
+      label: 'Коллизии',
+      data: cols,
+      backgroundColor: 'rgba(220,38,38,0.55)',
+      borderColor: '#dc2626',
+      borderWidth: 1
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => 'Коллизии: ' + ctx.parsed.y.toLocaleString('ru-RU')
+        }
+      }
+    },
+    scales: {
+      x: {
+        title: { display: true, text: 'Размер данных n', color: tickColor, font: { size: 12 } },
+        ticks: { color: tickColor },
+        grid: { color: gridColor }
+      },
+      y: {
+        title: { display: true, text: 'Число коллизий', color: tickColor, font: { size: 12 } },
+        ticks: { color: tickColor },
+        grid: { color: gridColor }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
